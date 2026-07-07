@@ -10,4 +10,15 @@ schedule status and live box scores.
 - Pause: disable the `live-tick` workflow in the Actions tab.
 - `keepalive` commits monthly so GitHub never auto-disables the schedule.
 
+`game-windows.json` lists every game day's ping window (earliest kickoff −15 min
+→ latest kickoff +6 h), generated from the schedule database. Ticks outside those
+windows exit without any network call, so the Neon database stays suspended and
+free on non-game days. Regenerate after schedule changes (and when playoff dates
+land in January) with:
+
+```
+cd ../redzone-signal && npm run pinger:windows
+cd ../cashedbets-live-pinger && git commit -am "refresh game windows" && git push
+```
+
 Note: GitHub cron is best-effort — ticks can occasionally run a few minutes late.

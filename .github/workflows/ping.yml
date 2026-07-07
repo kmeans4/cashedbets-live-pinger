@@ -1,8 +1,9 @@
 name: live-tick
 
-# Fires the CashedBets live-ingestion endpoint every 5 minutes. Outside NFL
-# game windows the endpoint's database gate exits in milliseconds with zero
-# Tank01 calls, so off-hours ticks are effectively free.
+# Fires the CashedBets live-ingestion endpoint every 5 minutes — but only
+# inside known NFL game-day windows (game-windows.json, generated from the
+# stored schedule). Outside those windows the job exits without any network
+# call, so the Neon database stays suspended and costs nothing.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -17,7 +18,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      - uses: actions/checkout@v4
+      - name: Skip outside game windows
+        id: gate
+        run: |
+          now=$(date +%s)
+          matches=$(jq --argjson now "$now" '[.windows[] | select($now >= .start and $now <= .end)] | length' game-windows.json)
+          if [ "$matches" -eq 0 ]; then
+            echo "outside game windows — skipping (database stays asleep)"
+            echo "in_window=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "inside a game window — pinging"
+            echo "in_window=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Ping live ingestion endpoint
+        if: steps.gate.outputs.in_window == 'true'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
