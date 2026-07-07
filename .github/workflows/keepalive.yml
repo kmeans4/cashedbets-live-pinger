@@ -1,0 +1,23 @@
+name: keepalive
+
+# GitHub disables scheduled workflows in repos with no activity for 60 days;
+# a monthly empty commit keeps the live-tick schedule running all season.
+on:
+  schedule:
+    - cron: "17 9 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Empty commit
+        run: |
+          git config user.name "keepalive"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "keepalive: keep scheduled workflows enabled"
+          git push
