@@ -22,9 +22,8 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           for attempt in 1 2 3; do
-            if response=$(curl -fsS -m 120 -H "Authorization: Bearer ${CRON_SECRET}" "https://cashedbets-v2.vercel.app/api/cron/tank01/live"); then
-              echo "tick ok:"
-              echo "$response" | head -c 800
+            if curl -fsS -o /dev/null -m 120 -H "Authorization: Bearer ${CRON_SECRET}" "https://cashedbets-v2.vercel.app/api/cron/tank01/live"; then
+              echo "tick ok"
               exit 0
             fi
             echo "attempt $attempt failed; retrying in 15s"
