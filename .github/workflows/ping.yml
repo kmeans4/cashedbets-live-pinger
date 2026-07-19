@@ -46,3 +46,27 @@ jobs:
           done
           echo "all attempts failed"
           exit 1
+      - name: Refresh live Survivor scoring
+        if: steps.gate.outputs.in_window == 'true'
+        env:
+          FANTASY_REFRESH_SECRET: ${{ secrets.FANTASY_REFRESH_SECRET }}
+        run: |
+          five_minute_slot=$(( $(date +%s) / 300 ))
+          if [ $(( five_minute_slot % 3 )) -ne 0 ]; then
+            echo "fantasy refresh is limited to one call per 15-minute slot"
+            exit 0
+          fi
+          if [ -z "${FANTASY_REFRESH_SECRET}" ]; then
+            echo "FANTASY_REFRESH_SECRET is not configured"
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            if curl -fsS -o /dev/null -m 120 -H "Authorization: Bearer ${FANTASY_REFRESH_SECRET}" "https://redzone-hq.vercel.app/api/cron/fantasy/live"; then
+              echo "fantasy refresh ok"
+              exit 0
+            fi
+            echo "fantasy refresh attempt $attempt failed; retrying in 15s"
+            sleep 15
+          done
+          echo "all fantasy refresh attempts failed"
+          exit 1

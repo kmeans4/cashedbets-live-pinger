@@ -7,6 +7,8 @@ endpoint exits instantly with zero provider calls; during games it refreshes
 schedule status and live box scores.
 
 - Auth: `CRON_SECRET` repository secret (never in code).
+- Survivor auth: `FANTASY_REFRESH_SECRET` repository secret, shared with the
+  RedZone HQ Production environment.
 - Pause: disable the `live-tick` workflow in the Actions tab.
 - `keepalive` commits monthly so GitHub never auto-disables the schedule.
 
@@ -20,5 +22,9 @@ land in January) with:
 cd ../redzone-signal && npm run pinger:windows
 cd ../cashedbets-live-pinger && git commit -am "refresh game windows" && git push
 ```
+
+After a successful ingestion tick, every third five-minute slot also calls
+RedZone HQ's `/api/cron/fantasy/live` route. The fantasy refresh is limited to
+the active regular-season week and writes only scores that changed.
 
 Note: GitHub cron is best-effort — ticks can occasionally run a few minutes late.
