@@ -27,9 +27,18 @@ jobs:
           if [ "$matches" -eq 0 ]; then
             echo "outside game windows — skipping (database stays asleep)"
             echo "in_window=false" >> "$GITHUB_OUTPUT"
+            echo "fantasy_in_window=false" >> "$GITHUB_OUTPUT"
           else
             echo "inside a game window — pinging"
             echo "in_window=true" >> "$GITHUB_OUTPUT"
+            fantasy_matches=$(jq --argjson now "$now" '[.windows[] | select($now >= .start and $now <= .end and .fantasyEligible == true)] | length' game-windows.json)
+            if [ "$fantasy_matches" -eq 0 ]; then
+              echo "outside regular-season fantasy windows — Survivor database stays asleep"
+              echo "fantasy_in_window=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "inside a regular-season fantasy window"
+              echo "fantasy_in_window=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
       - name: Ping live ingestion endpoint
         if: steps.gate.outputs.in_window == 'true'
@@ -47,7 +56,7 @@ jobs:
           echo "all attempts failed"
           exit 1
       - name: Refresh live Survivor scoring
-        if: steps.gate.outputs.in_window == 'true'
+        if: steps.gate.outputs.fantasy_in_window == 'true'
         env:
           FANTASY_REFRESH_SECRET: ${{ secrets.FANTASY_REFRESH_SECRET }}
         run: |

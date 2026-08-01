@@ -15,8 +15,11 @@ schedule status and live box scores.
 `game-windows.json` lists every game day's ping window (earliest kickoff −15 min
 → latest kickoff +6 h), generated from the schedule database. Ticks outside those
 windows exit without any network call, so the Neon database stays suspended and
-free on non-game days. Regenerate after schedule changes (and when playoff dates
-land in January) with:
+free on non-game days. Live analytics runs for every NFL game window; the
+separate Survivor refresh runs only when the generated window contains a
+regular-season game, keeping that Neon compute asleep during preseason and
+playoffs. Regenerate after schedule changes (and when playoff dates land in
+January) with:
 
 ```
 cd ../redzone-signal && npm run pinger:windows
