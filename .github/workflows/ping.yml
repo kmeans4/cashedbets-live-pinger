@@ -6,7 +6,8 @@ name: live-tick
 # call, so the Neon database stays suspended and costs nothing.
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Offset from the heavily contended :00/:05 GitHub Actions boundaries.
+    - cron: "3-58/5 * * * *"
   workflow_dispatch:
 
 concurrency:
