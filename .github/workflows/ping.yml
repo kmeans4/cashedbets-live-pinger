@@ -1,14 +1,17 @@
 name: live-tick
 
-# Fires the CashedBets live-ingestion endpoint every 5 minutes — but only
-# inside known NFL game-day windows (game-windows.json, generated from the
-# stored schedule). Outside those windows the job exits without any network
-# call, so the Neon database stays suspended and costs nothing.
+# GitHub can delay or drop frequent scheduled events. This hourly bootstrap
+# starts a five-minute worker before known game windows; the worker hands off
+# to a new workflow run before GitHub's six-hour hosted-runner limit.
 on:
   schedule:
-    # Offset from the heavily contended :00/:05 GitHub Actions boundaries.
-    - cron: "3-58/5 * * * *"
+    # Offset from the heavily contended start of each hour.
+    - cron: "17 * * * *"
   workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
 
 concurrency:
   group: live-tick
@@ -17,66 +20,13 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v5
-      - name: Skip outside game windows
-        id: gate
-        run: |
-          now=$(date +%s)
-          matches=$(jq --argjson now "$now" '[.windows[] | select($now >= .start and $now <= .end)] | length' game-windows.json)
-          if [ "$matches" -eq 0 ]; then
-            echo "outside game windows — skipping (database stays asleep)"
-            echo "in_window=false" >> "$GITHUB_OUTPUT"
-            echo "fantasy_in_window=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "inside a game window — pinging"
-            echo "in_window=true" >> "$GITHUB_OUTPUT"
-            fantasy_matches=$(jq --argjson now "$now" '[.windows[] | select($now >= .start and $now <= .end and .fantasyEligible == true)] | length' game-windows.json)
-            if [ "$fantasy_matches" -eq 0 ]; then
-              echo "outside regular-season fantasy windows — Survivor database stays asleep"
-              echo "fantasy_in_window=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "inside a regular-season fantasy window"
-              echo "fantasy_in_window=true" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-      - name: Ping live ingestion endpoint
-        if: steps.gate.outputs.in_window == 'true'
+      - name: Run resilient game-window worker
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          for attempt in 1 2 3; do
-            if curl -fsS -o /dev/null -m 120 -H "Authorization: Bearer ${CRON_SECRET}" "https://cashedbets-v2.vercel.app/api/cron/tank01/live"; then
-              echo "tick ok"
-              exit 0
-            fi
-            echo "attempt $attempt failed; retrying in 15s"
-            sleep 15
-          done
-          echo "all attempts failed"
-          exit 1
-      - name: Refresh live Survivor scoring
-        if: steps.gate.outputs.fantasy_in_window == 'true'
-        env:
           FANTASY_REFRESH_SECRET: ${{ secrets.FANTASY_REFRESH_SECRET }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          five_minute_slot=$(( $(date +%s) / 300 ))
-          if [ $(( five_minute_slot % 3 )) -ne 0 ]; then
-            echo "fantasy refresh is limited to one call per 15-minute slot"
-            exit 0
-          fi
-          if [ -z "${FANTASY_REFRESH_SECRET}" ]; then
-            echo "FANTASY_REFRESH_SECRET is not configured"
-            exit 1
-          fi
-          for attempt in 1 2 3; do
-            if curl -fsS -o /dev/null -m 120 -H "Authorization: Bearer ${FANTASY_REFRESH_SECRET}" "https://redzone-hq.vercel.app/api/cron/fantasy/live"; then
-              echo "fantasy refresh ok"
-              exit 0
-            fi
-            echo "fantasy refresh attempt $attempt failed; retrying in 15s"
-            sleep 15
-          done
-          echo "all fantasy refresh attempts failed"
-          exit 1
+          scripts/live-window-worker.sh
