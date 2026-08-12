@@ -17,8 +17,8 @@ to a fresh run before GitHub's six-hour hosted-runner limit.
 bootstrap horizon the job exits without any network call, so Neon stays suspended
 on non-game days. While waiting for kickoff, the worker also makes no app or
 database call. Live analytics runs for every NFL game window. The isolated
-rehearsal refresh runs only during preseason, while the real Survivor refresh
-runs only during regular-season windows. Regenerate
+rehearsal refresh runs only during its configured preseason slate, while the
+real Survivor refresh runs only during regular-season windows. Regenerate
 after schedule changes (and when playoff dates land in January) with:
 
 ```
