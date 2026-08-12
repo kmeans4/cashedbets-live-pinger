@@ -61,6 +61,7 @@ read -r window_start window_end <<< "$window"
 hard_stop=$((initial_now + handoff_after_seconds))
 if (( hard_stop > window_end )); then hard_stop="$window_end"; fi
 last_fantasy_slot=""
+last_rehearsal_slot=""
 
 echo "worker armed for window ${window_start}-${window_end}; hard stop ${hard_stop}"
 
@@ -84,6 +85,7 @@ while true; do
     fi
 
     fantasy_in_window="$(jq -r --argjson now "$now" '[.windows[] | select($now >= .start and $now <= .end and .fantasyEligible == true)] | length' "$windows_file")"
+    rehearsal_in_window="$(jq -r --argjson now "$now" '[.windows[] | select($now >= .start and $now <= .end and .rehearsalEligible == true)] | length' "$windows_file")"
     fantasy_slot=$((now / 900))
     if (( fantasy_in_window > 0 )) && [[ "$fantasy_slot" != "$last_fantasy_slot" ]] && [[ "$live_ingestion_ok" == "true" ]]; then
       if retry_request "fantasy refresh" "${FANTASY_REFRESH_SECRET:-}" "https://redzone-hq.vercel.app/api/cron/fantasy/live"; then
@@ -94,7 +96,17 @@ while true; do
     elif (( fantasy_in_window > 0 )) && [[ "$live_ingestion_ok" != "true" ]]; then
       echo "fantasy refresh deferred until live ingestion succeeds"
     elif (( fantasy_in_window == 0 )); then
-      echo "outside regular-season fantasy windows — Survivor database stays asleep"
+      echo "regular-season Survivor refresh skipped"
+    fi
+
+    if (( rehearsal_in_window > 0 )) && [[ "$fantasy_slot" != "$last_rehearsal_slot" ]] && [[ "$live_ingestion_ok" == "true" ]]; then
+      if retry_request "preseason rehearsal refresh" "${FANTASY_REFRESH_SECRET:-}" "https://redzone-hq.vercel.app/api/cron/fantasy/rehearsal/live"; then
+        last_rehearsal_slot="$fantasy_slot"
+      else
+        echo "preseason rehearsal refresh failed; worker will retry after the next successful ingestion tick" >&2
+      fi
+    elif (( rehearsal_in_window > 0 )) && [[ "$live_ingestion_ok" != "true" ]]; then
+      echo "preseason rehearsal refresh deferred until live ingestion succeeds"
     fi
   else
     echo "waiting for game window — databases stay asleep"

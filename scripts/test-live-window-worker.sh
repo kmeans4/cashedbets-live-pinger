@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-preseason_start="$(jq -r '.windows[] | select(.fantasyEligible == false) | .start' game-windows.json | head -1)"
+preseason_start="$(jq -r '.windows[] | select(.rehearsalEligible == true) | .start' game-windows.json | head -1)"
 regular_start="$(jq -r '.windows[] | select(.fantasyEligible == true) | .start' game-windows.json | head -1)"
 
 assert_output() {
@@ -23,8 +23,8 @@ assert_output "outside game-window bootstrap horizon" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=1 scripts/live-window-worker.sh
 assert_output "waiting for game window" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 3600)) scripts/live-window-worker.sh
-assert_output "outside regular-season fantasy windows" \
-  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH="$preseason_start" CRON_SECRET=test scripts/live-window-worker.sh
+assert_output "dry run: preseason rehearsal refresh" \
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH="$preseason_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "dry run: fantasy refresh" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "worker will retry on the next tick" \
@@ -34,4 +34,4 @@ assert_output "fantasy refresh deferred until live ingestion succeeds" \
 assert_output "dry run: workflow handoff" \
   env DRY_RUN=true WORKER_NOW_EPOCH="$regular_start" HANDOFF_AFTER_SECONDS=0 scripts/live-window-worker.sh
 
-echo "Live-window worker tests passed: off-window, pre-window, preseason, regular-season, and handoff behavior."
+echo "Live-window worker tests passed: off-window, pre-window, preseason rehearsal, regular-season, and handoff behavior."

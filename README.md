@@ -16,9 +16,9 @@ to a fresh run before GitHub's six-hour hosted-runner limit.
 → latest kickoff +6 h), generated from the schedule database. Outside the
 bootstrap horizon the job exits without any network call, so Neon stays suspended
 on non-game days. While waiting for kickoff, the worker also makes no app or
-database call. Live analytics runs for every NFL game window; the separate
-Survivor refresh runs only when the generated window contains a regular-season
-game, keeping that Neon compute asleep during preseason and playoffs. Regenerate
+database call. Live analytics runs for every NFL game window. The isolated
+rehearsal refresh runs only during preseason, while the real Survivor refresh
+runs only during regular-season windows. Regenerate
 after schedule changes (and when playoff dates land in January) with:
 
 ```
@@ -26,9 +26,10 @@ cd ../redzone-signal && npm run pinger:windows
 cd ../cashedbets-live-pinger && git commit -am "refresh game windows" && git push
 ```
 
-After a successful ingestion tick, each 15-minute slot also calls RedZone HQ's
-`/api/cron/fantasy/live` route. The fantasy refresh is limited to the active
-regular-season week and writes only scores that changed.
+After a successful ingestion tick, each 15-minute slot calls the appropriate
+RedZone HQ route: `/api/cron/fantasy/rehearsal/live` in preseason or
+`/api/cron/fantasy/live` in the regular season. Both write only scores that
+changed; archiving the rehearsal turns its route into a no-op.
 
 GitHub's scheduled bootstrap remains best-effort, but the long-running worker and
 self-handoff keep five-minute ticks independent of repeated schedule delivery once
