@@ -4,7 +4,7 @@ set -euo pipefail
 windows_file="${GAME_WINDOWS_FILE:-game-windows.json}"
 bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-28800}"
 handoff_after_seconds="${HANDOFF_AFTER_SECONDS:-16200}"
-tick_seconds="${TICK_SECONDS:-300}"
+tick_seconds="${TICK_SECONDS:-120}"
 dry_run="${DRY_RUN:-false}"
 worker_once="${WORKER_ONCE:-false}"
 
@@ -96,7 +96,7 @@ if (( hard_stop > window_end )); then hard_stop="$window_end"; fi
 ingestion_response_file="$(mktemp)"
 trap 'rm -f "$ingestion_response_file"' EXIT
 
-echo "worker armed for window ${window_start}-${window_end}; hard stop ${hard_stop}"
+echo "worker armed for window ${window_start}-${window_end}; polling every ${tick_seconds}s; hard stop ${hard_stop}"
 
 while true; do
   now="$(clock_now)"

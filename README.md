@@ -1,9 +1,9 @@
 # CashedBets live pinger
 
-Resilient 5-minute worker for CashedBets NFL live-stats ingestion (Vercel Hobby
+Resilient 2-minute worker for CashedBets NFL live-stats ingestion (Vercel Hobby
 crons are limited to daily). An hourly GitHub Actions bootstrap starts the worker
 up to eight hours before a known game window. Once active, the worker calls the
-protected `/api/cron/tank01/live` endpoint every five minutes and hands the window
+protected `/api/cron/tank01/live` endpoint every two minutes and hands the window
 to a fresh run before GitHub's six-hour hosted-runner limit.
 
 - Auth: `CRON_SECRET` repository secret (never in code).
@@ -29,12 +29,12 @@ cd ../cashedbets-live-pinger && git commit -am "refresh game windows" && git pus
 After a successful ingestion tick that changed at least one game payload, the worker calls the appropriate
 RedZone HQ route: `/api/cron/fantasy/rehearsal/live` in preseason or
 `/api/cron/fantasy/live` in the regular season. It also makes one final scoring
-call when the slate reports no live games. Unchanged five-minute ticks do not
+call when the slate reports no live games. Unchanged two-minute ticks do not
 wake the Survivor database. Both routes write only scores that changed;
 archiving the rehearsal turns its route into a no-op.
 
 GitHub's scheduled bootstrap remains best-effort, but the long-running worker and
-self-handoff keep five-minute ticks independent of repeated schedule delivery once
+self-handoff keep two-minute ticks independent of repeated schedule delivery once
 a game window has been claimed. The hourly bootstrap remains a fallback if a
 handoff ever fails. An individual endpoint failure is retried and reported, but
 does not terminate the worker; the next tick tries again, and Survivor scoring

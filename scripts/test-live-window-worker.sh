@@ -35,6 +35,8 @@ assert_output "outside game-window bootstrap horizon" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=1 scripts/live-window-worker.sh
 assert_output "waiting for game window" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 3600)) scripts/live-window-worker.sh
+assert_output "polling every 120s" \
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "dry run: preseason rehearsal refresh" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH="$preseason_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "dry run: fantasy refresh" \
