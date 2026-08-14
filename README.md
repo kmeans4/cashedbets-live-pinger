@@ -26,10 +26,12 @@ cd ../redzone-signal && npm run pinger:windows
 cd ../cashedbets-live-pinger && git commit -am "refresh game windows" && git push
 ```
 
-After a successful ingestion tick, each 15-minute slot calls the appropriate
+After a successful ingestion tick that changed at least one game payload, the worker calls the appropriate
 RedZone HQ route: `/api/cron/fantasy/rehearsal/live` in preseason or
-`/api/cron/fantasy/live` in the regular season. Both write only scores that
-changed; archiving the rehearsal turns its route into a no-op.
+`/api/cron/fantasy/live` in the regular season. It also makes one final scoring
+call when the slate reports no live games. Unchanged five-minute ticks do not
+wake the Survivor database. Both routes write only scores that changed;
+archiving the rehearsal turns its route into a no-op.
 
 GitHub's scheduled bootstrap remains best-effort, but the long-running worker and
 self-handoff keep five-minute ticks independent of repeated schedule delivery once
