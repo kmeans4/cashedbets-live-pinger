@@ -1,8 +1,9 @@
 {
   "season": 2026,
-  "generatedAt": "2026-08-12T14:26:14.491Z",
+  "generatedAt": "2026-08-18T16:37:28.148Z",
   "leadSeconds": 900,
   "tailSeconds": 21600,
+  "rehearsalWeek": 2,
   "gameDays": 67,
   "windows": [
     {
@@ -19,7 +20,7 @@
       "start": 1786661100,
       "end": 1786690800,
       "fantasyEligible": false,
-      "rehearsalEligible": true
+      "rehearsalEligible": false
     },
     {
       "date": "2026-08-14",
@@ -27,7 +28,7 @@
       "start": 1786747500,
       "end": 1786770000,
       "fantasyEligible": false,
-      "rehearsalEligible": true
+      "rehearsalEligible": false
     },
     {
       "date": "2026-08-15",
@@ -35,7 +36,7 @@
       "start": 1786812300,
       "end": 1786860000,
       "fantasyEligible": false,
-      "rehearsalEligible": true
+      "rehearsalEligible": false
     },
     {
       "date": "2026-08-20",
@@ -43,7 +44,7 @@
       "start": 1787269500,
       "end": 1787299200,
       "fantasyEligible": false,
-      "rehearsalEligible": false
+      "rehearsalEligible": true
     },
     {
       "date": "2026-08-21",
@@ -51,7 +52,7 @@
       "start": 1787352300,
       "end": 1787382000,
       "fantasyEligible": false,
-      "rehearsalEligible": false
+      "rehearsalEligible": true
     },
     {
       "date": "2026-08-22",
@@ -59,7 +60,7 @@
       "start": 1787413500,
       "end": 1787472000,
       "fantasyEligible": false,
-      "rehearsalEligible": false
+      "rehearsalEligible": true
     },
     {
       "date": "2026-08-23",
@@ -67,7 +68,7 @@
       "start": 1787528700,
       "end": 1787551200,
       "fantasyEligible": false,
-      "rehearsalEligible": false
+      "rehearsalEligible": true
     },
     {
       "date": "2026-08-27",
