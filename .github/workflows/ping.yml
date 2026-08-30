@@ -1,7 +1,7 @@
 name: live-tick
 
 # GitHub can delay or drop frequent scheduled events. This hourly bootstrap
-# starts a two-minute worker before known game windows; the worker hands off
+# starts a quota-aware worker before known game windows; the worker hands off
 # to a new workflow run before GitHub's six-hour hosted-runner limit.
 on:
   schedule:
@@ -28,6 +28,9 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           FANTASY_REFRESH_SECRET: ${{ secrets.FANTASY_REFRESH_SECRET }}
           GH_TOKEN: ${{ github.token }}
-          TICK_SECONDS: 120
+          # Five-minute live ticks keep scoring visitor-independent while
+          # protecting provider, Vercel, and Neon usage. Faster polling must be
+          # an explicit repository setting backed by a reviewed quota budget.
+          TICK_SECONDS: ${{ vars.TANK01_LIVE_TICK_SECONDS || '300' }}
         run: |
           scripts/live-window-worker.sh
