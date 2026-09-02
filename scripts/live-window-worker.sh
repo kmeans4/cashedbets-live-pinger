@@ -2,7 +2,9 @@
 set -euo pipefail
 
 windows_file="${GAME_WINDOWS_FILE:-game-windows.json}"
-bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-28800}"
+# The hourly workflow needs enough runway for scheduler delays without holding
+# a hosted runner for most of the day before kickoff.
+bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-7200}"
 handoff_after_seconds="${HANDOFF_AFTER_SECONDS:-16200}"
 tick_seconds="${TICK_SECONDS:-300}"
 max_consecutive_failures="${MAX_CONSECUTIVE_FAILURES:-3}"
@@ -17,6 +19,10 @@ fi
 
 if ! [[ "$tick_seconds" =~ ^[0-9]+$ ]] || (( tick_seconds < 60 )); then
   echo "TICK_SECONDS must be an integer of at least 60" >&2
+  exit 1
+fi
+if ! [[ "$bootstrap_lead_seconds" =~ ^[0-9]+$ ]] || (( bootstrap_lead_seconds < 3600 || bootstrap_lead_seconds > 14400 )); then
+  echo "BOOTSTRAP_LEAD_SECONDS must be between 3600 and 14400" >&2
   exit 1
 fi
 if ! [[ "$max_consecutive_failures" =~ ^[0-9]+$ ]] || (( max_consecutive_failures < 1 )); then

@@ -8,9 +8,14 @@ regular_start="$(jq -r '.windows[] | select(.fantasyEligible == true) | .start' 
 workflow_source="$(<.github/workflows/ping.yml)"
 worker_source="$(<scripts/live-window-worker.sh)"
 expected_workflow_tick="TICK_SECONDS: \${{ vars.TANK01_LIVE_TICK_SECONDS || '300' }}"
+expected_checkout="actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"
 
 if [[ "$workflow_source" != *"$expected_workflow_tick"* ]]; then
   echo "workflow must default to the approved 300-second live cadence" >&2
+  exit 1
+fi
+if [[ "$workflow_source" != *"$expected_checkout"* ]]; then
+  echo "workflow must pin actions/checkout to the reviewed v5 commit" >&2
   exit 1
 fi
 if [[ "$worker_source" != *"fantasy_refresh_pending=true"* ]] || [[ "$worker_source" != *"waiting for the pending fantasy refresh"* ]]; then
@@ -65,6 +70,8 @@ assert_failure_output() {
 
 assert_output "outside game-window bootstrap horizon" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=1 scripts/live-window-worker.sh
+assert_output "outside game-window bootstrap horizon" \
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 7201)) scripts/live-window-worker.sh
 assert_output "waiting for game window" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 3600)) scripts/live-window-worker.sh
 assert_output "polling every 300s" \
@@ -73,6 +80,8 @@ assert_output "polling every 60s" \
   env DRY_RUN=true WORKER_ONCE=true TICK_SECONDS=60 WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_failure_output "TICK_SECONDS must be an integer of at least 60" \
   env DRY_RUN=true WORKER_ONCE=true TICK_SECONDS=30 WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
+assert_failure_output "BOOTSTRAP_LEAD_SECONDS must be between 3600 and 14400" \
+  env DRY_RUN=true WORKER_ONCE=true BOOTSTRAP_LEAD_SECONDS=1800 WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
 assert_failure_output "MAX_CONSECUTIVE_FAILURES must be a positive integer" \
   env DRY_RUN=true WORKER_ONCE=true MAX_CONSECUTIVE_FAILURES=0 WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
 assert_failure_output "FAILURE_BACKOFF_SECONDS must be an integer no shorter than TICK_SECONDS" \

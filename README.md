@@ -2,7 +2,7 @@
 
 Resilient game-window worker for CashedBets NFL live-stats ingestion (Vercel Hobby
 crons are limited to daily). An hourly GitHub Actions bootstrap starts the worker
-up to eight hours before a known game window. Once active, the worker calls the
+up to two hours before a known game window. Once active, the worker calls the
 protected `/api/cron/tank01/live` endpoint at the configured cadence and hands the
 window to a fresh run before GitHub's six-hour hosted-runner limit.
 
