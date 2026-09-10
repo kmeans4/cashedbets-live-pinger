@@ -1,12 +1,12 @@
 name: live-tick
 
-# GitHub can delay or drop frequent scheduled events. This hourly bootstrap
+# GitHub can delay or drop frequent scheduled events. This frequent bootstrap
 # starts a quota-aware worker before known game windows; the worker hands off
 # to a new workflow run before GitHub's six-hour hosted-runner limit.
 on:
   schedule:
     # Offset from the heavily contended start of each hour.
-    - cron: "17 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:

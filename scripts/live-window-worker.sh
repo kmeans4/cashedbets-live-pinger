@@ -2,9 +2,9 @@
 set -euo pipefail
 
 windows_file="${GAME_WINDOWS_FILE:-game-windows.json}"
-# The hourly workflow needs enough runway for scheduler delays without holding
-# a hosted runner for most of the day before kickoff.
-bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-7200}"
+# Arm up to four hours early to tolerate delayed GitHub schedule delivery.
+# Waiting performs no provider or database calls.
+bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-14400}"
 handoff_after_seconds="${HANDOFF_AFTER_SECONDS:-16200}"
 tick_seconds="${TICK_SECONDS:-300}"
 max_consecutive_failures="${MAX_CONSECUTIVE_FAILURES:-3}"

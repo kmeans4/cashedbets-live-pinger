@@ -71,7 +71,9 @@ assert_failure_output() {
 assert_output "outside game-window bootstrap horizon" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=1 scripts/live-window-worker.sh
 assert_output "outside game-window bootstrap horizon" \
-  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 7201)) scripts/live-window-worker.sh
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 14401)) scripts/live-window-worker.sh
+assert_output "waiting for game window" \
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 14400)) scripts/live-window-worker.sh
 assert_output "waiting for game window" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 3600)) scripts/live-window-worker.sh
 assert_output "polling every 300s" \

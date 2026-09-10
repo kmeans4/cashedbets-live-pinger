@@ -1,8 +1,8 @@
 # CashedBets live pinger
 
 Resilient game-window worker for CashedBets NFL live-stats ingestion (Vercel Hobby
-crons are limited to daily). An hourly GitHub Actions bootstrap starts the worker
-up to two hours before a known game window. Once active, the worker calls the
+crons are limited to daily). A GitHub Actions bootstrap scheduled every 15 minutes starts the worker
+up to four hours before a known game window. Once active, the worker calls the
 protected `/api/cron/tank01/live` endpoint at the configured cadence and hands the
 window to a fresh run before GitHub's six-hour hosted-runner limit.
 
@@ -40,7 +40,7 @@ clock-only changes increment a lightweight presentation revision.
 
 GitHub's scheduled bootstrap remains best-effort, but the long-running worker and
 self-handoff keep live ticks independent of repeated schedule delivery once
-a game window has been claimed. The hourly bootstrap remains a fallback if a
+a game window has been claimed. The 15-minute bootstrap remains a fallback if a
 handoff ever fails. An individual endpoint failure is retried and reported, but
 does not terminate the worker. After three failed ticks, a 15-minute circuit
 breaker pauses provider work before trying again. Survivor scoring waits for a
