@@ -2,13 +2,16 @@
 
 Resilient game-window worker for CashedBets NFL live-stats ingestion (Vercel Hobby
 crons are limited to daily). A GitHub Actions bootstrap scheduled every 15 minutes starts the worker
-up to four hours before a known game window. Once active, the worker calls the
+up to twelve hours before a known game window. Once active, the worker calls the
 protected `/api/cron/tank01/live` endpoint at the configured cadence and hands the
 window to a fresh run before GitHub's six-hour hosted-runner limit.
 
 - Auth: `CRON_SECRET` repository secret (never in code).
 - Survivor auth: `FANTASY_REFRESH_SECRET` repository secret, shared with the
-  RedZone HQ Production environment.
+  RedZone HQ Production environment. The worker also sends its dedicated RedZone
+  HQ Vercel automation credential from the `HQ_AUTOMATION_SECRET` repository
+  secret on the HQ request. Rotate this credential through Vercel and GitHub
+  Actions secrets together.
 - Pause: disable the `live-tick` workflow in the Actions tab.
 - `keepalive` commits monthly so GitHub never auto-disables the schedule.
 
@@ -34,8 +37,9 @@ cd ../cashedbets-live-pinger && git commit -am "refresh game windows" && git pus
 After a successful ingestion tick that changed scoring data or live presentation
 fields such as the game clock, the worker calls the RedZone HQ route
 `/api/cron/fantasy/live` during the regular season. It also makes one final scoring
-call when the slate reports no live games. Unchanged ticks do not
-modify the Survivor database. Score changes use the normal scoring path, while
+call when the slate reports it is settled. A newly started worker reconciles
+the current live scores once to catch up after an interrupted delivery.
+Subsequent unchanged ticks skip Survivor. Score changes use the normal scoring path, while
 clock-only changes increment a lightweight presentation revision.
 
 GitHub's scheduled bootstrap remains best-effort, but the long-running worker and

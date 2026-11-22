@@ -2,9 +2,9 @@
 set -euo pipefail
 
 windows_file="${GAME_WINDOWS_FILE:-game-windows.json}"
-# Arm up to four hours early to tolerate delayed GitHub schedule delivery.
+# Arm up to twelve hours early to tolerate missed GitHub schedule deliveries.
 # Waiting performs no provider or database calls.
-bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-14400}"
+bootstrap_lead_seconds="${BOOTSTRAP_LEAD_SECONDS:-43200}"
 handoff_after_seconds="${HANDOFF_AFTER_SECONDS:-16200}"
 tick_seconds="${TICK_SECONDS:-300}"
 max_consecutive_failures="${MAX_CONSECUTIVE_FAILURES:-3}"
@@ -21,8 +21,8 @@ if ! [[ "$tick_seconds" =~ ^[0-9]+$ ]] || (( tick_seconds < 60 )); then
   echo "TICK_SECONDS must be an integer of at least 60" >&2
   exit 1
 fi
-if ! [[ "$bootstrap_lead_seconds" =~ ^[0-9]+$ ]] || (( bootstrap_lead_seconds < 3600 || bootstrap_lead_seconds > 14400 )); then
-  echo "BOOTSTRAP_LEAD_SECONDS must be between 3600 and 14400" >&2
+if ! [[ "$bootstrap_lead_seconds" =~ ^[0-9]+$ ]] || (( bootstrap_lead_seconds < 3600 || bootstrap_lead_seconds > 43200 )); then
+  echo "BOOTSTRAP_LEAD_SECONDS must be between 3600 and 43200" >&2
   exit 1
 fi
 if ! [[ "$max_consecutive_failures" =~ ^[0-9]+$ ]] || (( max_consecutive_failures < 1 )); then
@@ -42,28 +42,34 @@ clock_now() {
   fi
 }
 
-retry_request() {
-  local name="$1"
-  local secret="$2"
-  local url="$3"
+refresh_survivor() {
+  local query="$1"
+  local url="https://redzone-hq.vercel.app/api/cron/fantasy/live${query}"
 
-  if [[ -z "$secret" ]]; then
-    echo "$name secret is not configured" >&2
-    return 1
-  fi
   if [[ "$dry_run" == "true" ]]; then
-    echo "dry run: $name $url"
+    echo "dry run: fantasy refresh $url"
     return 0
   fi
+  if [[ -z "${FANTASY_REFRESH_SECRET:-}" || -z "${HQ_AUTOMATION_SECRET:-}" ]]; then
+    echo "fantasy refresh credentials are not configured" >&2
+    return 1
+  fi
   for attempt in 1 2 3; do
-    if curl -fsS -o /dev/null -m 120 -H "Authorization: Bearer ${secret}" "$url"; then
-      echo "$name ok"
+    if curl -fsS -m 120 \
+      -H "Authorization: Bearer ${FANTASY_REFRESH_SECRET}" \
+      -H "x-vercel-protection-bypass: ${HQ_AUTOMATION_SECRET}" "$url" |
+      jq -se --arg query "$query" 'length == 1 and (.[0] | .ok == true and (
+        .skipped == "no_active_regular_season_week" or
+        ((.week | type) == "number" and
+          (if $query == "" then .score != null else .presentationRevision != null end))
+      ))' >/dev/null; then
+      echo "fantasy refresh ok"
       return 0
     fi
-    echo "$name attempt $attempt failed; retrying in 15s"
+    echo "fantasy refresh attempt $attempt failed; retrying in 15s"
     sleep 15
   done
-  echo "all $name attempts failed" >&2
+  echo "all fantasy refresh attempts failed" >&2
   return 1
 }
 
@@ -81,11 +87,12 @@ live_ingestion_request() {
     local dry_run_changed_games="${DRY_RUN_CHANGED_GAMES:-1}"
     local dry_run_presentation_changes="${DRY_RUN_PRESENTATION_CHANGES:-$dry_run_changed_games}"
     local dry_run_slate_settled="${DRY_RUN_SLATE_SETTLED:-false}"
+    local dry_run_live_games="${DRY_RUN_LIVE_GAMES:-1}"
     jq -n \
       --argjson changed "$dry_run_changed_games" \
       --argjson presentation "$dry_run_presentation_changes" \
-      --argjson settled "$dry_run_slate_settled" \
-      '{summary:{changedGameIDs:[range(0; $changed) | "dry-run-\(.)"],presentationChangedGameIDs:[range(0; $presentation) | "dry-run-presentation-\(.)"],liveGamesNow:(if $settled then 0 else 1 end),slateSettled:$settled}}' \
+      --argjson live "$dry_run_live_games" --argjson settled "$dry_run_slate_settled" \
+      '{summary:{changedGameIDs:[range(0; $changed) | "dry-run-\(.)"],presentationChangedGameIDs:[range(0; $presentation) | "dry-run-presentation-\(.)"],liveGamesNow:(if $settled then 0 else $live end),slateSettled:$settled}}' \
       > "$output_file"
     return 0
   fi
@@ -123,6 +130,7 @@ echo "worker armed for window ${window_start}-${window_end}; polling every ${tic
 consecutive_failures=0
 circuit_open_until=0
 fantasy_refresh_pending=false
+catch_up_on_start=true
 pending_refresh_query=""
 
 while true; do
@@ -167,23 +175,30 @@ while true; do
     fi
     should_refresh=false
     refresh_query=""
-    if (( changed_games > 0 )); then
+    # A previous worker may have imported stats without delivering them to HQ.
+    # Reconcile once after startup when live stats exist, even on an unchanged tick.
+    if [[ "$live_ingestion_ok" == "true" && "$catch_up_on_start" == "true" ]] &&
+      jq -e '(.summary.liveGamesNow // 0) > 0' "$ingestion_response_file" >/dev/null; then
+      should_refresh=true
+    elif (( changed_games > 0 )) || [[ "$slate_settled" == "true" ]]; then
       should_refresh=true
       refresh_query=""
     elif (( presentation_changes > 0 )); then
       should_refresh=true
       refresh_query="?presentation=1"
-    elif [[ "$slate_settled" == "true" ]]; then
-      should_refresh=final
     fi
 
     if (( fantasy_in_window > 0 )) && [[ "$should_refresh" != "false" ]]; then
+      # Keep a pending full score even when the next change only updates a clock.
+      if [[ "$fantasy_refresh_pending" == "false" || -z "$refresh_query" ]]; then
+        pending_refresh_query="$refresh_query"
+      fi
       fantasy_refresh_pending=true
-      pending_refresh_query="$refresh_query"
     fi
 
     if (( fantasy_in_window > 0 )) && [[ "$live_ingestion_ok" == "true" ]] && [[ "$fantasy_refresh_pending" == "true" ]]; then
-      if retry_request "fantasy refresh" "${FANTASY_REFRESH_SECRET:-}" "https://redzone-hq.vercel.app/api/cron/fantasy/live${pending_refresh_query}"; then
+      if refresh_survivor "$pending_refresh_query"; then
+        if [[ -z "$pending_refresh_query" ]]; then catch_up_on_start=false; fi
         fantasy_refresh_pending=false
         pending_refresh_query=""
       else
@@ -225,7 +240,7 @@ if [[ "$dry_run" == "true" ]]; then
   exit 0
 fi
 if [[ -z "${GITHUB_REPOSITORY:-}" || -z "${GH_TOKEN:-}" ]]; then
-  echo "workflow handoff unavailable; hourly bootstrap remains the fallback" >&2
+  echo "workflow handoff unavailable; scheduled bootstrap remains the fallback" >&2
   exit 1
 fi
 

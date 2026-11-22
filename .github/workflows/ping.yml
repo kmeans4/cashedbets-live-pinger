@@ -29,6 +29,7 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           FANTASY_REFRESH_SECRET: ${{ secrets.FANTASY_REFRESH_SECRET }}
+          HQ_AUTOMATION_SECRET: ${{ secrets.HQ_AUTOMATION_SECRET }}
           GH_TOKEN: ${{ github.token }}
           # Five-minute live ticks keep scoring visitor-independent while
           # protecting provider, Vercel, and Neon usage. Faster polling must be

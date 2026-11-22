@@ -71,9 +71,9 @@ assert_failure_output() {
 assert_output "outside game-window bootstrap horizon" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=1 scripts/live-window-worker.sh
 assert_output "outside game-window bootstrap horizon" \
-  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 14401)) scripts/live-window-worker.sh
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 43201)) scripts/live-window-worker.sh
 assert_output "waiting for game window" \
-  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 14400)) scripts/live-window-worker.sh
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 43200)) scripts/live-window-worker.sh
 assert_output "waiting for game window" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 3600)) scripts/live-window-worker.sh
 assert_output "polling every 300s" \
@@ -82,7 +82,7 @@ assert_output "polling every 60s" \
   env DRY_RUN=true WORKER_ONCE=true TICK_SECONDS=60 WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_failure_output "TICK_SECONDS must be an integer of at least 60" \
   env DRY_RUN=true WORKER_ONCE=true TICK_SECONDS=30 WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
-assert_failure_output "BOOTSTRAP_LEAD_SECONDS must be between 3600 and 14400" \
+assert_failure_output "BOOTSTRAP_LEAD_SECONDS must be between 3600 and 43200" \
   env DRY_RUN=true WORKER_ONCE=true BOOTSTRAP_LEAD_SECONDS=1800 WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
 assert_failure_output "MAX_CONSECUTIVE_FAILURES must be a positive integer" \
   env DRY_RUN=true WORKER_ONCE=true MAX_CONSECUTIVE_FAILURES=0 WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
@@ -92,12 +92,19 @@ assert_output "dry run: fantasy refresh" \
   env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_not_output "presentation=1" \
   env DRY_RUN=true DRY_RUN_CHANGED_GAMES=1 DRY_RUN_PRESENTATION_CHANGES=1 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
-assert_not_output "fantasy refresh" \
-  env DRY_RUN=true DRY_RUN_CHANGED_GAMES=0 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
+# The Sunday morning bootstrap that previously exited can now arm for kickoff.
+assert_output "waiting for game window" \
+  env DRY_RUN=true WORKER_ONCE=true WORKER_NOW_EPOCH=$((regular_start - 6 * 3600)) scripts/live-window-worker.sh
 assert_output "dry run: fantasy refresh" \
-  env DRY_RUN=true DRY_RUN_CHANGED_GAMES=0 DRY_RUN_PRESENTATION_CHANGES=1 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
+  env DRY_RUN=true DRY_RUN_CHANGED_GAMES=0 WORKER_ONCE=true CRON_SECRET=test WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
+assert_not_output "presentation=1" \
+  env DRY_RUN=true DRY_RUN_CHANGED_GAMES=0 DRY_RUN_PRESENTATION_CHANGES=1 WORKER_ONCE=true CRON_SECRET=test WORKER_NOW_EPOCH="$regular_start" scripts/live-window-worker.sh
+assert_not_output "fantasy refresh" \
+  env DRY_RUN=true DRY_RUN_LIVE_GAMES=0 DRY_RUN_CHANGED_GAMES=0 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
+assert_output "dry run: fantasy refresh" \
+  env DRY_RUN=true DRY_RUN_LIVE_GAMES=0 DRY_RUN_CHANGED_GAMES=0 DRY_RUN_PRESENTATION_CHANGES=1 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "presentation=1" \
-  env DRY_RUN=true DRY_RUN_CHANGED_GAMES=0 DRY_RUN_PRESENTATION_CHANGES=1 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
+  env DRY_RUN=true DRY_RUN_LIVE_GAMES=0 DRY_RUN_CHANGED_GAMES=0 DRY_RUN_PRESENTATION_CHANGES=1 WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "all games settled; ending worker early" \
   env DRY_RUN=true DRY_RUN_CHANGED_GAMES=0 DRY_RUN_SLATE_SETTLED=true WORKER_NOW_EPOCH="$regular_start" CRON_SECRET=test FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "worker will retry on the next tick" \
@@ -106,5 +113,34 @@ assert_output "fantasy refresh deferred until live ingestion succeeds" \
   env WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start" FANTASY_REFRESH_SECRET=test scripts/live-window-worker.sh
 assert_output "dry run: workflow handoff" \
   env DRY_RUN=true WORKER_NOW_EPOCH="$regular_start" HANDOFF_AFTER_SECONDS=0 scripts/live-window-worker.sh
+
+# Exercise actual request construction and acknowledgement using offline stand-ins.
+mock_bin="$(mktemp -d)"
+trap 'rm -rf "$mock_bin"' EXIT
+cat > "$mock_bin/curl" <<'MOCK'
+#!/usr/bin/env bash
+set -eu
+case "${!#}" in
+  https://cashedbets-v2.vercel.app/api/cron/tank01/live)
+    [[ "$*" == *"Bearer test-signal"* && "$*" != *"test-hq"* ]]
+    echo '{"summary":{"changedGameIDs":[],"presentationChangedGameIDs":[],"liveGamesNow":1}}'
+    ;;
+  https://redzone-hq.vercel.app/api/cron/fantasy/live)
+    [[ "$*" == *"Authorization: Bearer test-hq-app"* && "$*" == *"x-vercel-protection-bypass: test-hq-worker"* ]]
+    printf '%s' "$MOCK_HQ_RESPONSE"
+    ;;
+  *) exit 1 ;;
+esac
+MOCK
+printf '#!/bin/sh\nexit 0\n' > "$mock_bin/sleep"
+chmod +x "$mock_bin/curl" "$mock_bin/sleep"
+mock_worker=(env PATH="$mock_bin:$PATH" WORKER_ONCE=true WORKER_NOW_EPOCH="$regular_start"
+  CRON_SECRET=test-signal FANTASY_REFRESH_SECRET=test-hq-app HQ_AUTOMATION_SECRET=test-hq-worker)
+assert_output "fantasy refresh ok" "${mock_worker[@]}" \
+  MOCK_HQ_RESPONSE='{"ok":true,"week":11,"score":{"week":11}}' scripts/live-window-worker.sh
+assert_output "all fantasy refresh attempts failed" "${mock_worker[@]}" \
+  MOCK_HQ_RESPONSE='' scripts/live-window-worker.sh
+assert_output "all fantasy refresh attempts failed" "${mock_worker[@]}" \
+  MOCK_HQ_RESPONSE='{"ok":true,"week":11,"score":null}' scripts/live-window-worker.sh
 
 echo "Live-window worker tests passed: off-window, pre-window, scoring and presentation changes, regular-season, failure, and handoff behavior."
